@@ -533,6 +533,7 @@ public abstract class AbstractQueuedSynchronizer
     private volatile int state;
 
     /**
+     * // NOTE_BY_ZWC: show how many threand requiring current lock
      * Returns the current value of synchronization state.
      * This operation has memory semantics of a {@code volatile} read.
      * @return current state value
@@ -564,6 +565,7 @@ public abstract class AbstractQueuedSynchronizer
     protected final boolean compareAndSetState(int expect, int update) {
         // See below for intrinsics setup to support this
         return unsafe.compareAndSwapInt(this, stateOffset, expect, update);
+
     }
 
     // Queuing utilities
