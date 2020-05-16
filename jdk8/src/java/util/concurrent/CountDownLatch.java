@@ -170,6 +170,7 @@ public class CountDownLatch {
         }
 
         protected int tryAcquireShared(int acquires) {
+            // 有线程小于0
             return (getState() == 0) ? 1 : -1;
         }
 
@@ -180,6 +181,7 @@ public class CountDownLatch {
                 if (c == 0)
                     return false;
                 int nextc = c-1;
+                //  尝试释放wq
                 if (compareAndSetState(c, nextc))
                     return nextc == 0;
             }

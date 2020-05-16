@@ -67,7 +67,7 @@ import sun.misc.Unsafe;
  * <p>This class supports either or both a default <em>exclusive</em>
  * mode and a <em>shared</em> mode. When acquired in exclusive mode,
  * attempted acquires by other threads cannot succeed. Shared mode
- * acquires by multiple threads may (but need not) succeed. This class
+ * acquires by multile threads may (but need not) succeed. This class
  * does not &quot;understand&quot; these differences except in the
  * mechanical sense that when a shared mode acquire succeeds, the next
  * waiting thread (if one exists) must also determine whether it can
@@ -605,16 +605,23 @@ public abstract class AbstractQueuedSynchronizer
      * @return the new node
      */
     private Node addWaiter(Node mode) {
+        // 这里的mode其实只有两种值,一种是Node.SHARE,一种是exclusive.
+        // 真正区分的的是
         Node node = new Node(Thread.currentThread(), mode);
         // Try the fast path of enq; backup to full enq on failure
         Node pred = tail;
+        // 如果有前节点,加入并返回
         if (pred != null) {
             node.prev = pred;
-            if (compareAndSetTail(pred, node)) {
+            //尽管之前已经进入了if，但是进入if之后可能由于多线程操作造成已经修改了pre。所以这里再次使用
+            //cas来防止并发，如果发现cas的时候已经改变了，那么就通过最后的enq方式来尝试增加
+            if (compareAndSetTail(pred, node)) { // 如果节点已经被更新,无法进入方法
                 pred.next = node;
                 return node;
             }
         }
+        // 前节点可能没有初始化尾部节点.
+        // 有与可能出现变并发,这个方法内部进行了循环,直到设置成功为止
         enq(node);
         return node;
     }
@@ -683,6 +690,8 @@ public abstract class AbstractQueuedSynchronizer
          */
         for (;;) {
             Node h = head;
+            //  NOTE_BY_ZWC: CountDownLatch中,只有一个Node节点,这个节点就是Tail==Head
+            // //  NOTE_BY_ZWC: 所以不会进入这个节点
             if (h != null && h != tail) {
                 int ws = h.waitStatus;
                 if (ws == Node.SIGNAL) {
@@ -817,6 +826,7 @@ public abstract class AbstractQueuedSynchronizer
              * need a signal, but don't park yet.  Caller will need to
              * retry to make sure it cannot acquire before parking.
              */
+            // 把前一个结点的waitstatus设置成signal
             compareAndSetWaitStatus(pred, ws, Node.SIGNAL);
         }
         return false;
@@ -979,15 +989,21 @@ public abstract class AbstractQueuedSynchronizer
      * Acquires in shared interruptible mode.
      * @param arg the acquire argument
      */
+    // CountDownLatch 是在await的时候进入
     private void doAcquireSharedInterruptibly(int arg)
         throws InterruptedException {
+        //  NOTE_BY_ZWC:  addWaiter 内部保证了一定能够添加,且线程安全
+        // 而且,addWaiter内部没有设置state的增加.这意味这仅仅是获取共享锁
         final Node node = addWaiter(Node.SHARED);
         boolean failed = true;
         try {
             for (;;) {
+                // p 是前结点
                 final Node p = node.predecessor();
+                // 头结点,因为只有头节点需要设置WatiStatus为propergate
                 if (p == head) {
                     int r = tryAcquireShared(arg);
+                    //  NOTE_BY_ZWC: countCownLatch中,如果线程已经没有了,不进入方法
                     if (r >= 0) {
                         setHeadAndPropagate(node, r);
                         p.next = null; // help GC
@@ -995,8 +1011,9 @@ public abstract class AbstractQueuedSynchronizer
                         return;
                     }
                 }
+                //  NOTE_BY_ZWC: countDownLatch , 计数还没有回到0的时候,会进入这个方法
                 if (shouldParkAfterFailedAcquire(p, node) &&
-                    parkAndCheckInterrupt())
+                    parkAndCheckInterrupt())  //  NOTE_BY_ZWC: countDownLatch 节点在这之后会park
                     throw new InterruptedException();
             }
         } finally {
@@ -1302,6 +1319,7 @@ public abstract class AbstractQueuedSynchronizer
             throws InterruptedException {
         if (Thread.interrupted())
             throw new InterruptedException();
+        // 如果是CountDownLatch方法,这个方法在有多个线程的时候进入
         if (tryAcquireShared(arg) < 0)
             doAcquireSharedInterruptibly(arg);
     }
@@ -1340,6 +1358,7 @@ public abstract class AbstractQueuedSynchronizer
      * @return the value returned from {@link #tryReleaseShared}
      */
     public final boolean releaseShared(int arg) {
+        //  NOTE_BY_ZWC: 如果是CountDownLatch ,try的时候会把state-1
         if (tryReleaseShared(arg)) {
             doReleaseShared();
             return true;
