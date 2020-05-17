@@ -407,7 +407,7 @@ public class ReentrantReadWriteLock
             if (c != 0) {
                 // (Note: if c != 0 and w == 0 then shared count != 0
                 // 这里,如果当前线程获取了读锁,由于读锁没有修改独占线程,这里会返回false,失败
-                //  NOTE_BY_ZWC: 正确的名称是锁升级.RRWLock不允许升级
+                //  NOTE_BY_ZWC: 正确的名称是锁升级.RRWLock不支持锁升级
                 if (w == 0 || current != getExclusiveOwnerThread())
                     return false;
                 //  NOTE_BY_ZWC: 已有的所和要获取的所的和大于了最大允许值 2^16 - 1,错误
