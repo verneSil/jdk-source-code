@@ -874,7 +874,11 @@ public abstract class AbstractQueuedSynchronizer
             for (;;) {
                 final Node p = node.predecessor();
                 // 一直等到是第一个节点
-                if (p == head && tryAcquire(arg)) { //如果是头节点却获取失败了,返回失败
+                if (p == head && tryAcquire(arg)) {
+                    //如果是头节点却获取失败了,返回失败
+                    //在RRWLock中,返回失败代表成功
+                    // 这里是一个出队列的操作.以RRWLock为例,TryLock()的时候不会修改AQS里的队列,因为不会增加队列
+                    // 但是Lock()是必须获取锁(无中断情况下),所以需要加入队列,然后自旋获取锁,获取后执行出队列操作.
                     setHead(node);
                     p.next = null; // help GC
                     failed = false;
@@ -1286,6 +1290,7 @@ public abstract class AbstractQueuedSynchronizer
         if (tryRelease(arg)) {
             Node h = head;
             if (h != null && h.waitStatus != 0)
+                // 这里unpark不进行note队列的修改
                 unparkSuccessor(h);
             return true;
         }
