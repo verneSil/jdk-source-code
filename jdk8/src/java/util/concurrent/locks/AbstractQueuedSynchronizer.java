@@ -617,10 +617,10 @@ public abstract class AbstractQueuedSynchronizer
             //cas来防止并发，如果发现cas的时候已经改变了，那么就通过最后的enq方式来尝试增加
             if (compareAndSetTail(pred, node)) { // 如果节点已经被更新,无法进入方法
                 pred.next = node;
-                return node;
             }
         }
         // 前节点可能没有初始化尾部节点.
+        return node;
         // 有与可能出现变并发,这个方法内部进行了循环,直到设置成功为止
         enq(node);
         return node;
@@ -703,6 +703,7 @@ public abstract class AbstractQueuedSynchronizer
                          !compareAndSetWaitStatus(h, 0, Node.PROPAGATE))
                     continue;                // loop on failed CAS
             }
+            //  NOTE_BY_ZWC:  头结点没有改变,直接返回
             if (h == head)                   // loop if head changed
                 break;
         }
@@ -872,12 +873,14 @@ public abstract class AbstractQueuedSynchronizer
             boolean interrupted = false;
             for (;;) {
                 final Node p = node.predecessor();
-                if (p == head && tryAcquire(arg)) {
+                // 一直等到是第一个节点
+                if (p == head && tryAcquire(arg)) { //如果是头节点却获取失败了,返回失败
                     setHead(node);
                     p.next = null; // help GC
                     failed = false;
                     return interrupted;
                 }
+                // 如果线程interrupt了
                 if (shouldParkAfterFailedAcquire(p, node) &&
                     parkAndCheckInterrupt())
                     interrupted = true;
@@ -1215,7 +1218,10 @@ public abstract class AbstractQueuedSynchronizer
      */
     public final void acquire(int arg) {
         if (!tryAcquire(arg) &&
+            // 获取队列中的
             acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
+            // acquirene内部是自旋获取锁,如果自旋过程中发现已经终端,返回true,这时候会进入下面
+            // 这个方法,调用线程的interrupt,将在下一次阻塞的时候进行回收
             selfInterrupt();
     }
 
@@ -1319,7 +1325,7 @@ public abstract class AbstractQueuedSynchronizer
             throws InterruptedException {
         if (Thread.interrupted())
             throw new InterruptedException();
-        // 如果是CountDownLatch方法,这个方法在有多个线程的时候进入
+        // NOTE_BY_ZWC: 如果是CountDownLatch方法,这个方法在有多个线程的时候进入
         if (tryAcquireShared(arg) < 0)
             doAcquireSharedInterruptibly(arg);
     }
@@ -1358,7 +1364,9 @@ public abstract class AbstractQueuedSynchronizer
      * @return the value returned from {@link #tryReleaseShared}
      */
     public final boolean releaseShared(int arg) {
-        //  NOTE_BY_ZWC: 如果是CountDownLatch ,try的时候会把state-1
+        //  NOTE_BY_ZWC: 如果是CountDownLatch ,try的时候只是会把state-1
+        //  NOTE_BY_ZWC: 如果是RRWLock,
+        //  NOTE_BY_ZWC: 如果是
         if (tryReleaseShared(arg)) {
             doReleaseShared();
             return true;
@@ -1537,8 +1545,7 @@ public abstract class AbstractQueuedSynchronizer
         Node t = tail; // Read fields in reverse initialization order
         Node h = head;
         Node s;
-        return h != t &&
-            ((s = h.next) == null || s.thread != Thread.currentThread());
+        return h != t && ((s = h.next) == null || s.thread != Thread.currentThread());
     }
 
 
