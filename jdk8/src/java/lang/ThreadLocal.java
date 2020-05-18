@@ -310,6 +310,7 @@ public class ThreadLocal<T> {
             Object value;
 
             Entry(ThreadLocal<?> k, Object v) {
+                // 这里是个弱引用,因而会发声内存泄漏的问题
                 super(k);
                 value = v;
             }

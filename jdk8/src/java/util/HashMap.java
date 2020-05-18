@@ -454,6 +454,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             throw new IllegalArgumentException("Illegal load factor: " +
                                                loadFactor);
         this.loadFactor = loadFactor;
+        //  NOTE_BY_ZWC: 如果创建对象new HashMap(10),但是初始化并不是初始化成10而是16
         this.threshold = tableSizeFor(initialCapacity);
     }
 
